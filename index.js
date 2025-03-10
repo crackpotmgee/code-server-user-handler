@@ -15,61 +15,83 @@ const app = express();
 
 app.use((req, res, next) => {
   const username = req.header('X-User');
+  const email = req.header('X-Email');
 
   if (!username) {
     return res.status(400).send('Missing X-User header');
   }
 
-  const steps = [
-    { label: 'Checking user profile...', completed: false },
-    { label: 'Creating user profile...', completed: false },
-    { label: 'Adding user to group...', completed: false },
-    { label: 'Starting codeserver user instance...', completed: false },
-  ];
+  if (!email) {
+    return res.status(400).send('Missing X-Email header');
+  }
 
-  const updateSplashScreen = (stepIndex) => {
-    steps[stepIndex].completed = true;
-    const splashScreenHtml = ReactDOMServer.renderToString(React.createElement(SplashScreen, { steps }));
-    res.write(splashScreenHtml);
-  };
+  const allowedUsersPath = process.env.ALLOWED_USERS_PATH;
+  if (!allowedUsersPath) {
+    return res.status(500).send('ALLOWED_USERS environment variable is not set');
+  }
 
-  res.write('<!DOCTYPE html><html><head><title>Setup in Progress</title></head><body>');
-  res.write('<div id="root">');
+  fs.readFile(allowedUsersPath, 'utf8', (err, data) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Failed to read allowed users file');
+    }
 
-  checkUser(username, req.header('GroupId'))
-    .then(() => {
-      updateSplashScreen(0);
-      return createUser(username, req.header('GroupId'));
-    })
-    .then(() => {
-      updateSplashScreen(1);
-      return enableService(username);
-    })
-    .then(() => {
-      updateSplashScreen(2);
-      return startService(username);
-    })
-    .then(() => {
-      updateSplashScreen(3);
-      res.write('</div></body></html>');
-      forwardRequest(req, res);
-    })
-    .catch((error) => {
-      console.error(error);
-      fs.appendFile('error.log', `${new Date().toISOString()} - ${error.message}\n`, (err) => {
-        if (err) console.error('Failed to write to log file:', err);
+    const allowedEmails = data.split('\n').map(line => line.trim()).filter(line => line);
+    if (!allowedEmails.includes(email)) {
+      return res.status(403).send('Email not allowed');
+    }
+
+    const steps = [
+      { label: 'Checking user profile...', completed: false },
+      { label: 'Creating user profile...', completed: false },
+      { label: 'Adding user to group...', completed: false },
+      { label: 'Starting codeserver user instance...', completed: false },
+    ];
+
+    const updateSplashScreen = (stepIndex) => {
+      steps[stepIndex].completed = true;
+      const splashScreenHtml = ReactDOMServer.renderToString(React.createElement(SplashScreen, { steps }));
+      res.write(splashScreenHtml);
+    };
+
+    res.write('<!DOCTYPE html><html><head><title>Setup in Progress</title></head><body>');
+    res.write('<div id="root">');
+
+    checkUser(username, req.header('GroupId'))
+      .then(() => {
+        updateSplashScreen(0);
+        return createUser(username, req.header('GroupId'));
+      })
+      .then(() => {
+        updateSplashScreen(1);
+        return enableService(username);
+      })
+      .then(() => {
+        updateSplashScreen(2);
+        return startService(username);
+      })
+      .then(() => {
+        updateSplashScreen(3);
+        res.write('</div></body></html>');
+        forwardRequest(req, res);
+      })
+      .catch((error) => {
+        console.error(error);
+        fs.appendFile('error.log', `${new Date().toISOString()} - ${error.message}\n`, (err) => {
+          if (err) console.error('Failed to write to log file:', err);
+        });
+
+        if (process.env.NODE_ENV === 'development') {
+          res.write(`<p>An error occurred: ${error.message}</p>`);
+          res.write(`<pre>${error.stack}</pre>`);
+        } else {
+          res.write('<p>An error occurred. Please check the logs for more details.</p>');
+        }
+
+        res.write('</div></body></html>');
+        res.end();
       });
-
-      if (process.env.NODE_ENV === 'development') {
-        res.write(`<p>An error occurred: ${error.message}</p>`);
-        res.write(`<pre>${error.stack}</pre>`);
-      } else {
-        res.write('<p>An error occurred. Please check the logs for more details.</p>');
-      }
-
-      res.write('</div></body></html>');
-      res.end();
-    });
+  });
 });
 
 module.exports = app; // Export the app instance
