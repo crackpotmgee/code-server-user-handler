@@ -131,6 +131,11 @@ function createUser(username, groupId) {
     // if no group id set it will not attempt to add one
     exec(`useradd -m ${ groupId ? '-g' + groupId : ''} ${username}`, (error) => {
       if (error) {
+        // its ok if the user already exists
+        if(error.message.includes('already exists')) {
+          resolve();
+          return;
+        }
         reject(new Error(`Failed to create user: ${error.message}`));
       } else {
         resolve();
