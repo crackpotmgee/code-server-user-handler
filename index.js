@@ -19,11 +19,11 @@ app.use((req, res, next) => {
   const username = req.header('X-User');
   const email = req.header('X-Email');
 
-  if (!username) {
+  if (!username || username === 'undefined') {
     return res.status(400).send('Missing X-User header');
   }
 
-  if (!email) {
+  if (!email || email === 'undefined') {
     return res.status(400).send('Missing X-Email header');
   }
 
