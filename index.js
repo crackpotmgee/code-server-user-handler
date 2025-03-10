@@ -27,6 +27,8 @@ app.use((req, res, next) => {
     return res.status(400).send('Missing X-Email header');
   }
 
+  const groupId = process.env.GROUP_ID;
+
   const allowedUsersPath = process.env.ALLOWED_USERS_PATH;
   if (!allowedUsersPath) {
     return res.status(500).send('ALLOWED_USERS environment variable is not set');
@@ -59,10 +61,10 @@ app.use((req, res, next) => {
     res.write('<!DOCTYPE html><html><head><title>Setup in Progress</title></head><body>');
     res.write('<div id="root">');
 
-    checkUser(username, req.header('GroupId'))
+    checkUser(username, groupId)
       .then(() => {
         updateSplashScreen(0);
-        return createUser(username, req.header('GroupId'));
+        return createUser(username, groupId);
       })
       .then(() => {
         updateSplashScreen(1);
@@ -126,7 +128,8 @@ function checkUser(username, groupId) {
 
 function createUser(username, groupId) {
   return new Promise((resolve, reject) => {
-    exec(`useradd -m -g ${groupId} ${username}`, (error) => {
+    // if no group id set it will not attempt to add one
+    exec(`useradd -m ${ groupId ? '-g' + groupId : ''} ${username}`, (error) => {
       if (error) {
         reject(new Error(`Failed to create user: ${error.message}`));
       } else {
