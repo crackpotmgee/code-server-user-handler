@@ -9,10 +9,25 @@ const SplashScreen = () => {
   ]);
 
   useEffect(() => {
+    const updateStep = (index) => {
+      setSteps((prevSteps) =>
+        prevSteps.map((step, i) =>
+          i === index ? { ...step, completed: true } : step
+        )
+      );
+    };
+
     const checkUser = async () => {
       try {
-        await checkUser('username', 'groupId');
-        setSteps((prevSteps) => prevSteps.map((step) => ({ ...step, completed: true })));
+        // Simulate each step with a timeout
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        updateStep(0);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        updateStep(1);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        updateStep(2);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        updateStep(3);
       } catch (error) {
         // Handle error
       }

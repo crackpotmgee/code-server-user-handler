@@ -1,9 +1,15 @@
+require('@babel/register')({
+  presets: ['@babel/preset-env', '@babel/preset-react']
+});
+
+require('dotenv').config(); // Ensure dotenv is used
+
 const express = require('express');
 const fs = require('fs');
 const { exec } = require('child_process');
 const React = require('react');
 const ReactDOMServer = require('react-dom/server');
-const SplashScreen = require('./src/views/SplashScreen').default;
+const SplashScreen = require('./src/views/SplashScreen.jsx'); // Updated file extension
 
 const app = express();
 
@@ -50,7 +56,19 @@ app.use((req, res, next) => {
     })
     .catch((error) => {
       console.error(error);
-      res.status(500).send('Internal server error');
+      fs.appendFile('error.log', `${new Date().toISOString()} - ${error.message}\n`, (err) => {
+        if (err) console.error('Failed to write to log file:', err);
+      });
+
+      if (process.env.NODE_ENV === 'development') {
+        res.write(`<p>An error occurred: ${error.message}</p>`);
+        res.write(`<pre>${error.stack}</pre>`);
+      } else {
+        res.write('<p>An error occurred. Please check the logs for more details.</p>');
+      }
+
+      res.write('</div></body></html>');
+      res.end();
     });
 });
 
@@ -68,10 +86,10 @@ function checkUser(username, groupId) {
               resolve();
             })
             .catch((error) => {
-              reject(error);
+              reject(new Error(`Failed to create user: ${error.message}`));
             });
         } else {
-          reject(error);
+          reject(new Error(`Failed to check user: ${error.message}`));
         }
       } else {
         resolve();
@@ -84,7 +102,7 @@ function createUser(username, groupId) {
   return new Promise((resolve, reject) => {
     exec(`useradd -m -g ${groupId} ${username}`, (error) => {
       if (error) {
-        reject(error);
+        reject(new Error(`Failed to create user: ${error.message}`));
       } else {
         resolve();
       }
@@ -96,7 +114,7 @@ function enableService(username) {
   return new Promise((resolve, reject) => {
     exec(`sudo systemctl enable code-server@${username}.service`, (error) => {
       if (error) {
-        reject(error);
+        reject(new Error(`Failed to enable service: ${error.message}`));
       } else {
         resolve();
       }
@@ -108,7 +126,7 @@ function startService(username) {
   return new Promise((resolve, reject) => {
     exec(`sudo systemctl start code-server@${username}.service`, (error) => {
       if (error) {
-        reject(error);
+        reject(new Error(`Failed to start service: ${error.message}`));
       } else {
         resolve();
       }
