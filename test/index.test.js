@@ -22,7 +22,7 @@ describe('User Handler Tests', () => {
   const allowedEmails = 'allowed@example.com\nanother@example.com';
 
   beforeEach(() => {
-    process.env.ALLOWED_USERS = allowedUsersPath;
+    process.env.ALLOWED_USERS_PATH = allowedUsersPath;
     fs.readFile.mockImplementation((filePath, encoding, callback) => {
       if (filePath === allowedUsersPath) {
         callback(null, allowedEmails);

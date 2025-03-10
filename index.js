@@ -2,7 +2,9 @@ require('@babel/register')({
   presets: ['@babel/preset-env', '@babel/preset-react']
 });
 
-require('dotenv').config(); // Ensure dotenv is used
+const currentNodeEnv = process.env.NODE_ENV;
+
+require('dotenv').config({path: `./environment/.env${currentNodeEnv ? '.' + currentNodeEnv.toLowerCase() : ''}`}); // Ensure dotenv is used
 
 const express = require('express');
 const fs = require('fs');
