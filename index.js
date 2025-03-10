@@ -62,7 +62,9 @@ app.use((req, res, next) => {
     const updateSplashScreen = (stepIndex) => {
       steps[stepIndex].completed = true;
       const splashScreenHtml = ReactDOMServer.renderToString(React.createElement(SplashScreen, { steps }));
-      res.write(splashScreenHtml);
+      if (!res.headersSent) {
+        res.write(splashScreenHtml);
+      }
     };
 
     res.write('<!DOCTYPE html><html><head><title>Setup in Progress</title></head><body>');
@@ -105,15 +107,16 @@ app.use((req, res, next) => {
           if (err) console.error('Failed to write to log file:', err);
         });
 
-        if (process.env.NODE_ENV === 'development') {
-          res.write(`<p>An error occurred: ${error.message}</p>`);
-          res.write(`<pre>${error.stack}</pre>`);
-        } else {
-          res.write('<p>An error occurred. Please check the logs for more details.</p>');
+        if (!res.headersSent) {
+          if (process.env.NODE_ENV === 'development') {
+            res.write(`<p>An error occurred: ${error.message}</p>`);
+            res.write(`<pre>${error.stack}</pre>`);
+          } else {
+            res.write('<p>An error occurred. Please check the logs for more details.</p>');
+          }
+          res.write('</div></body></html>');
+          res.end();
         }
-
-        res.write('</div></body></html>');
-        res.end();
       });
   });
 });
@@ -193,7 +196,7 @@ function addUserToGroup(username, groupId) {
 function startCodeServer(username) {
   return new Promise((resolve, reject) => {
     const port = getAvailablePort();
-    const command = `sudo -u ${username} bash -c "code-server --port ${port}"`;
+    const command = `sudo -u ${username} bash -c "code-server --port ${port} --user-data-dir ~/.code-server --extensions-dir ~/.vscode-extensions --auth none"`;
     exec(command, (error) => {
       if (error) {
         reject(new Error(`Failed to start code-server: ${error.message}`));
