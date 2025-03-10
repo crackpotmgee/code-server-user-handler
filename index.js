@@ -11,6 +11,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const React = require('react');
 const ReactDOMServer = require('react-dom/server');
+const request = require('request'); // Import the request module
 const SplashScreen = require('./src/views/SplashScreen').default; // Ensure correct import
 
 const app = express();
