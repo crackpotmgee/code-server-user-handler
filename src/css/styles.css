@@ -1,0 +1,26 @@
+.splash-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+  
+  .splash-screen h1 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+  }
+  
+  .splash-screen ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .splash-screen li {
+    margin-bottom: 0.5rem;
+  }
+  
+  .splash-screen .completed {
+    color: green;
+  }
