@@ -11,7 +11,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const React = require('react');
 const ReactDOMServer = require('react-dom/server');
-const SplashScreen = require('./src/views/SplashScreen.jsx'); // Updated file extension
+const SplashScreen = require('./src/views/SplashScreen').default; // Ensure correct import
 
 const app = express();
 
