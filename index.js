@@ -13,10 +13,12 @@ const React = require('react');
 const ReactDOMServer = require('react-dom/server');
 const http = require('http'); // Import the http module
 const path = require('path');
+const httpProxy = require('http-proxy'); // Import the http-proxy module
 const SplashScreen = require('./src/views/SplashScreen').default; // Ensure correct import
 
 const app = express();
 const portMappingsPath = path.resolve(__dirname, 'portMappings.json');
+const proxy = httpProxy.createProxyServer({ ws: true }); // Create a proxy server with WebSocket support
 
 app.use((req, res, next) => {
   const username = req.header('X-User');
@@ -52,6 +54,7 @@ app.use((req, res, next) => {
       { label: 'Checking user profile...', completed: false },
       { label: 'Creating user profile...', completed: false },
       { label: 'Adding user to group...', completed: false },
+      { label: 'Checking existing code-server instance...', completed: false },
       { label: 'Starting codeserver user instance...', completed: false },
     ];
 
@@ -75,10 +78,22 @@ app.use((req, res, next) => {
       })
       .then(() => {
         updateSplashScreen(2);
-        return startCodeServer(username);
+        const portMapping = getPortMapping(username);
+        if (portMapping) {
+          return checkPort(portMapping.port).then((isRunning) => {
+            if (isRunning) {
+              updateSplashScreen(3); // Mark the new step as completed
+              return portMapping.port;
+            } else {
+              return startCodeServer(username);
+            }
+          });
+        } else {
+          return startCodeServer(username);
+        }
       })
       .then((port) => {
-        updateSplashScreen(3);
+        updateSplashScreen(4);
         res.write('</div></body></html>');
         res.end();
         forwardRequest(req, res, port);
@@ -106,6 +121,16 @@ module.exports = app; // Export the app instance
 
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Server listening on port ${process.env.PORT || 3000}`);
+});
+
+app.on('upgrade', (req, socket, head) => {
+  const username = req.headers['x-user'];
+  const portMapping = getPortMapping(username);
+  if (portMapping) {
+    proxy.ws(req, socket, head, { target: `http://localhost:${portMapping.port}` });
+  } else {
+    socket.destroy();
+  }
 });
 
 function checkUser(username, groupId) {
@@ -179,6 +204,21 @@ function startCodeServer(username) {
   });
 }
 
+function checkPort(port) {
+  return new Promise((resolve) => {
+    const server = http.createServer();
+    server.once('error', () => {
+      resolve(true);
+    });
+    server.once('listening', () => {
+      server.close(() => {
+        resolve(false);
+      });
+    });
+    server.listen(port);
+  });
+}
+
 function getAvailablePort() {
   const minPort = 8000;
   const maxPort = 9000;
@@ -199,6 +239,11 @@ function getPortMappings() {
   return JSON.parse(data);
 }
 
+function getPortMapping(username) {
+  const mappings = getPortMappings();
+  return mappings.find(mapping => mapping.username === username);
+}
+
 function updatePortMapping(username, port) {
   const mappings = getPortMappings();
   const existingMapping = mappings.find(mapping => mapping.username === username);
@@ -212,7 +257,7 @@ function updatePortMapping(username, port) {
 
 function forwardRequest(req, res, port) {
   const options = {
-    hostname: 'localhost',
+    hostname: process.env.DESTINATION_HOST ?? 'localhost',
     port: port,
     path: req.url,
     method: req.method,
