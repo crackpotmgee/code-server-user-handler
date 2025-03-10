@@ -1,0 +1,30 @@
+.splash-screen {
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+.progress-bar {
+  width: 100%;
+  background-color: #f3f3f3;
+  border: 1px solid #ccc;
+  margin: 20px 0;
+}
+
+.progress {
+  height: 20px;
+  background-color: #4caf50;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+li {
+  margin: 10px 0;
+}
+
+li.completed {
+  text-decoration: line-through;
+  color: #4caf50;
+}

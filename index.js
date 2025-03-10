@@ -21,6 +21,15 @@ const app = express();
 const portMappingsPath = path.resolve(__dirname, 'portMappings.json');
 const proxy = httpProxy.createProxyServer({ ws: true }); // Create a proxy server with WebSocket support
 
+const stepTimeout = process.env.STEP_TIMEOUT || 30000; // Default to 30 seconds
+
+const withTimeout = (promise, timeout) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Step timed out')), timeout))
+  ]);
+};
+
 app.use((req, res, next) => {
   const username = req.header('X-User');
   const email = req.header('X-Email');
@@ -73,29 +82,29 @@ app.use((req, res, next) => {
     res.write('<!DOCTYPE html><html><head><title>Setup in Progress</title></head><body>');
     res.write('<div id="root">');
 
-    checkUser(username, groupId)
+    withTimeout(checkUser(username, groupId), stepTimeout)
       .then(() => {
         updateSplashScreen(0);
-        return createUser(username, groupId);
+        return withTimeout(createUser(username, groupId), stepTimeout);
       })
       .then(() => {
         updateSplashScreen(1);
-        return addUserToGroup(username, groupId);
+        return withTimeout(addUserToGroup(username, groupId), stepTimeout);
       })
       .then(() => {
         updateSplashScreen(2);
         const portMapping = getPortMapping(username);
         if (portMapping) {
-          return checkPort(portMapping.port).then((isRunning) => {
+          return withTimeout(checkPort(portMapping.port), stepTimeout).then((isRunning) => {
             if (isRunning) {
               updateSplashScreen(3); // Mark the new step as completed
               return portMapping.port;
             } else {
-              return startCodeServer(username);
+              return withTimeout(startCodeServer(username), stepTimeout);
             }
           });
         } else {
-          return startCodeServer(username);
+          return withTimeout(startCodeServer(username), stepTimeout);
         }
       })
       .then((port) => {
