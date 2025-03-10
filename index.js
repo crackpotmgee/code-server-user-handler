@@ -61,6 +61,9 @@ app.use((req, res, next) => {
 
     const updateSplashScreen = (stepIndex) => {
       steps[stepIndex].completed = true;
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Step ${stepIndex + 1}: ${steps[stepIndex].label}`);
+      }
       const splashScreenHtml = ReactDOMServer.renderToString(React.createElement(SplashScreen, { steps }));
       if (!res.headersSent) {
         res.write(splashScreenHtml);
