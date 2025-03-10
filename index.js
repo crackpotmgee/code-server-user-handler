@@ -14,6 +14,7 @@ const ReactDOMServer = require('react-dom/server');
 const http = require('http'); // Import the http module
 const path = require('path');
 const httpProxy = require('http-proxy'); // Import the http-proxy module
+const net = require('net'); // Import the net module
 const SplashScreen = require('./src/views/SplashScreen').default; // Ensure correct import
 
 const app = express();
@@ -206,13 +207,17 @@ function startCodeServer(username) {
 
 function checkPort(port) {
   return new Promise((resolve) => {
-    const server = http.createServer();
-    server.once('error', () => {
-      resolve(true);
+    const server = net.createServer();
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(true); // Port is in use
+      } else {
+        resolve(false); // Some other error occurred
+      }
     });
     server.once('listening', () => {
       server.close(() => {
-        resolve(false);
+        resolve(false); // Port is available
       });
     });
     server.listen(port);
