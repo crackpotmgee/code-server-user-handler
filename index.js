@@ -4,7 +4,7 @@ require('@babel/register')({
 
 const currentNodeEnv = process.env.NODE_ENV;
 
-require('dotenv').config({path: `./environment/.env${currentNodeEnv ? '.' + currentNodeEnv.toLowerCase() : ''}`}); // Ensure dotenv is used
+require('dotenv').config({ path: `./environment/.env${currentNodeEnv ? '.' + currentNodeEnv.toLowerCase() : ''}` }); // Ensure dotenv is used
 
 const express = require('express');
 const fs = require('fs');
@@ -12,9 +12,11 @@ const { exec } = require('child_process');
 const React = require('react');
 const ReactDOMServer = require('react-dom/server');
 const http = require('http'); // Import the http module
+const path = require('path');
 const SplashScreen = require('./src/views/SplashScreen').default; // Ensure correct import
 
 const app = express();
+const portMappingsPath = path.resolve(__dirname, 'portMappings.json');
 
 app.use((req, res, next) => {
   const username = req.header('X-User');
@@ -69,16 +71,17 @@ app.use((req, res, next) => {
       })
       .then(() => {
         updateSplashScreen(1);
-        return enableService(username);
+        return addUserToGroup(username, groupId);
       })
       .then(() => {
         updateSplashScreen(2);
-        return startService(username);
+        return startCodeServer(username);
       })
-      .then(() => {
+      .then((port) => {
         updateSplashScreen(3);
         res.write('</div></body></html>');
-        forwardRequest(req, res);
+        res.end();
+        forwardRequest(req, res, port);
       })
       .catch((error) => {
         console.error(error);
@@ -145,11 +148,15 @@ function createUser(username, groupId) {
   });
 }
 
-function enableService(username) {
+function addUserToGroup(username, groupId) {
   return new Promise((resolve, reject) => {
-    exec(`sudo systemctl enable code-server@${username}.service`, (error) => {
+    if (!groupId) {
+      resolve();
+      return;
+    }
+    exec(`usermod -aG ${groupId} ${username}`, (error) => {
       if (error) {
-        reject(new Error(`Failed to enable service: ${error.message}`));
+        reject(new Error(`Failed to add user to group: ${error.message}`));
       } else {
         resolve();
       }
@@ -157,31 +164,65 @@ function enableService(username) {
   });
 }
 
-function startService(username) {
+function startCodeServer(username) {
   return new Promise((resolve, reject) => {
-    exec(`sudo systemctl start code-server@${username}.service`, (error) => {
+    const port = getAvailablePort();
+    const command = `sudo -u ${username} bash -c "code-server --port ${port}"`;
+    exec(command, (error) => {
       if (error) {
-        reject(new Error(`Failed to start service: ${error.message}`));
+        reject(new Error(`Failed to start code-server: ${error.message}`));
       } else {
-        resolve();
+        updatePortMapping(username, port);
+        resolve(port);
       }
     });
   });
 }
 
-function forwardRequest(req, res) {
-  const targetPort = process.env.TARGET_PORT || 8443;
+function getAvailablePort() {
+  const minPort = 8000;
+  const maxPort = 9000;
+  const usedPorts = getPortMappings().map(mapping => mapping.port);
+  for (let port = minPort; port <= maxPort; port++) {
+    if (!usedPorts.includes(port)) {
+      return port;
+    }
+  }
+  throw new Error('No available ports');
+}
 
+function getPortMappings() {
+  if (!fs.existsSync(portMappingsPath)) {
+    return [];
+  }
+  const data = fs.readFileSync(portMappingsPath, 'utf8');
+  return JSON.parse(data);
+}
+
+function updatePortMapping(username, port) {
+  const mappings = getPortMappings();
+  const existingMapping = mappings.find(mapping => mapping.username === username);
+  if (existingMapping) {
+    existingMapping.port = port;
+  } else {
+    mappings.push({ username, port });
+  }
+  fs.writeFileSync(portMappingsPath, JSON.stringify(mappings, null, 2));
+}
+
+function forwardRequest(req, res, port) {
   const options = {
     hostname: 'localhost',
-    port: targetPort,
+    port: port,
     path: req.url,
     method: req.method,
     headers: req.headers
   };
 
   const proxy = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    if (!res.headersSent) {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    }
     proxyRes.pipe(res, {
       end: true
     });
@@ -189,8 +230,10 @@ function forwardRequest(req, res) {
 
   proxy.on('error', (err) => {
     console.error('Error forwarding request:', err);
-    res.statusCode = 500;
-    res.end('Internal Server Error');
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.end('Internal Server Error');
+    }
   });
 
   req.pipe(proxy, {
