@@ -11,7 +11,7 @@ const fs = require('fs');
 const { exec } = require('child_process');
 const React = require('react');
 const ReactDOMServer = require('react-dom/server');
-const request = require('request'); // Import the request module
+const http = require('http'); // Import the http module
 const SplashScreen = require('./src/views/SplashScreen').default; // Ensure correct import
 
 const app = express();
@@ -172,11 +172,28 @@ function startService(username) {
 function forwardRequest(req, res) {
   const targetPort = process.env.TARGET_PORT || 8443;
 
-  req.pipe(
-    request({
-      port: targetPort,
-      method: req.method,
-      headers: req.headers,
-    })
-  ).pipe(res);
+  const options = {
+    hostname: 'localhost',
+    port: targetPort,
+    path: req.url,
+    method: req.method,
+    headers: req.headers
+  };
+
+  const proxy = http.request(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers);
+    proxyRes.pipe(res, {
+      end: true
+    });
+  });
+
+  proxy.on('error', (err) => {
+    console.error('Error forwarding request:', err);
+    res.statusCode = 500;
+    res.end('Internal Server Error');
+  });
+
+  req.pipe(proxy, {
+    end: true
+  });
 }
