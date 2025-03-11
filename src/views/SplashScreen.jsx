@@ -1,30 +1,23 @@
-import React from 'react';
-import './SplashScreen.css';
+import React, { useState, useEffect } from 'react';
 
-const SplashScreen = ({ steps }) => {mpletedSteps = steps.filter(step => step.completed).length;
-  const completedSteps = steps.filter(step => step.completed).length;etedSteps / steps.length) * 100;
-  const progressPercentage = (completedSteps / steps.length) * 100;
+const SplashScreen = ({ inputSteps }) => {
+  const [steps, setSteps] = useState(inputSteps || []);
 
-  return (een">
+  useEffect(() => {
+    setSteps(inputSteps || []);
+  }, [inputSteps]); // Add inputSteps as a dependency
+
+  return (
     <div className="splash-screen">
-      <h1>Setup in Progress</h1>ogress-bar">
-      <div className="progress-bar">assName="progress" style={{ width: `${progressPercentage}%` }}></div>
-        <div className="progress" style={{ width: `${progressPercentage}%` }}></div>>
-      </div>
-      <ul>teps.map((step) => (
-        {steps.map((step) => (      <li key={step.label} className={step.completed ? 'completed' : ''}>
-          <li key={step.label} className={step.completed ? 'completed' : ''}>          {step.label}
-            {step.label}          </li>
+      <h1>Setup in Progress</h1>
+      <ul>
+        {steps.map((step) => (
+          <li key={step.label} className={step.status}>
+            {step.label} - {step.status}
           </li>
-        ))}      </ul>
-
-
-
-
-
-
-
-export default SplashScreen;};  );    </div>      </ul>    </div>
+        ))}
+      </ul>
+    </div>
   );
 };
 
